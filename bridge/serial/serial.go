@@ -1,6 +1,7 @@
 package serial
 
 import (
+	"errors"
 	"fmt"
 
 	"go.bug.st/serial"
@@ -11,6 +12,10 @@ var connected bool
 
 // Connects to target serial port
 func Connect(target string, baudrate int) error {
+	if target == "" {
+		fmt.Println("Failed opening serial port: no ports could be autodiscovered")
+		return errors.New("Port autodetect failed")
+	}
 	mode := &serial.Mode{
 		BaudRate: baudrate,
 		InitialStatusBits: &serial.ModemOutputBits{
