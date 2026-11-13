@@ -1,0 +1,98 @@
+#include <U8g2lib.h>
+#include <Wire.h>
+
+U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, U8X8_PIN_NONE);
+
+// Initializes connection to OLED display
+void initDisplay() {
+  u8g2.begin();
+  Wire.setClock(400000);
+}
+
+// Some runtime variables
+uint32_t updateDisplayTime = 0;
+uint8_t displayId = 0;
+const uint8_t displaysCount = 5;
+uint32_t tripOffset = 0;
+
+// Updates display with all data received?
+void updateDisplay(bool buttonClick, bool buttonHold) {
+  // Button events
+  if (packet.header[0] == specialChar) {
+    if (buttonClick && ++displayId >= displaysCount) displayId = 0;
+    if (displayId == 2 && buttonHold) tripOffset = packet.odometer;
+  }
+
+  // Throttle refresh speed
+  uint32_t now = millis();
+  if (now - updateDisplayTime <= 50) return;
+  updateDisplayTime = now;
+  u8g2.clearBuffer();
+
+  // Welcome message
+  if (packet.header[0] != specialChar) {
+    u8g2.setFont(u8g2_font_mystery_quest_24_tf);
+    u8g2.drawStr(15, 32, "GruzDash");
+    u8g2.setFont(u8g2_font_luRS08_tf);
+    u8g2.drawStr(1, 56, "Connect PC to continue");
+    u8g2.sendBuffer();
+    return;
+  }
+
+  char buf[16];
+
+  // Odometer / Mileage display
+  u8g2.setFont(u8g2_font_spleen16x32_mu);
+  sprintf(buf, "%05d", packet.odometer / 1000);
+  u8g2.drawStr(28, 32, buf);
+  u8g2.setFont(u8g2_font_missingplanet_tf);
+  sprintf(buf, "%02d", (packet.odometer % 1000) / 10);
+  u8g2.drawStr(112, 21, buf);
+  u8g2.drawStr(112, 32, "km");
+
+  // Bottom bars & gear
+  u8g2.drawHLine(0, 45, 128);
+  u8g2.drawVLine(108, 45, 18);
+  String gear;
+  if (packet.gear == 0) gear = "R";
+  else if (packet.gear == 1) gear = "N";
+  else gear = String(packet.gear - 1);
+  u8g2.setFont(u8g2_font_koleeko_tf);
+  u8g2.drawStr(116, 60, gear.c_str());
+
+  // Trip calculations
+  if (tripOffset == 0) tripOffset = packet.odometer;
+  uint32_t trip_diff = packet.odometer - tripOffset;
+  float trip = trip_diff / 1000.0;
+  if (trip >= 1000) {
+    tripOffset = packet.odometer - (trip - 1000.0);
+    trip = 0;
+  }
+
+  // Switchable display
+  u8g2.setFont(u8g2_font_6x13_tf);
+  if (displayId == 5 && !(packet.flags & OG_TURBO)) displayId = 0;
+  if (displayId == 0) {
+    time_t t = packet.time;
+    strftime(buf, sizeof(buf), "%d %b  %H:%M", gmtime(&t));
+  }
+  else if (displayId == 1) {
+    sprintf(buf, "Speed: %.0f kph", packet.speed * 3.6);
+  }
+  else if (displayId == 2) {
+    sprintf(buf, "Trip: %.2f km", trip);
+  }
+  else if (displayId == 3) {
+    sprintf(buf, "Fuel: %.1f%%", packet.fuel * 100);
+  }
+  else if (displayId == 4) {
+    sprintf(buf, "Engine: %.1f C", packet.engTemp);
+  }
+  else if (displayId == 5) {
+    sprintf(buf, "Boost: %.2f bar", packet.turbo);
+  }
+  u8g2.drawStr(3, 60, buf);
+
+  // Update display
+  u8g2.sendBuffer();
+}
