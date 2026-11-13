@@ -1,4 +1,9 @@
+# Configs
 config.json
 config-custom.h
 config-speedo.h
 config-tacho.h
+
+# Binary executables
+bridge/outgouge*64
+bridge/outgouge*.exe
