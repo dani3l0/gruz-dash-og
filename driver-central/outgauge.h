@@ -94,7 +94,7 @@ void readOG() {
     buffIndex++;
     // Calculate XOR checksum
     uint8_t calcChecksum = 0;
-    for (int i = 0; i < packetSize - 1; i++) {
+    for (unsigned int i = 0; i < packetSize - 1; i++) {
       calcChecksum ^= buff[i];
     }
     uint8_t receivedChecksum = buff[packetSize - 1];

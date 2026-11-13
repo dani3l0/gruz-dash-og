@@ -1,6 +1,10 @@
 #include <U8g2lib.h>
 #include <Wire.h>
 
+// Wrapper to use instead of unsafe sprintf
+#define mkbuf(buf, ...) snprintf(buf, sizeof(buf), __VA_ARGS__)
+
+// Display initializer class
 U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, U8X8_PIN_NONE);
 
 // Initializes connection to OLED display
@@ -12,7 +16,7 @@ void initDisplay() {
 // Some runtime variables
 uint32_t updateDisplayTime = 0;
 uint8_t displayId = 0;
-const uint8_t displaysCount = 5;
+const uint8_t displaysCount = 6;
 uint32_t tripOffset = 0;
 
 // Updates display with all data received?
@@ -39,34 +43,40 @@ void updateDisplay(bool buttonClick, bool buttonHold) {
     return;
   }
 
-  char buf[16];
+  char buf[32];
 
   // Odometer / Mileage display
   u8g2.setFont(u8g2_font_spleen16x32_mu);
-  sprintf(buf, "%05d", packet.odometer / 1000);
+  mkbuf(buf, "%05" PRIu32, packet.odometer / 1000);
   u8g2.drawStr(28, 32, buf);
   u8g2.setFont(u8g2_font_missingplanet_tf);
-  sprintf(buf, "%02d", (packet.odometer % 1000) / 10);
+  mkbuf(buf, "%02" PRIu32, (packet.odometer % 1000) / 10);
   u8g2.drawStr(112, 21, buf);
   u8g2.drawStr(112, 32, "km");
 
-  // Bottom bars & gear
+  // Bottom bars
   u8g2.drawHLine(0, 45, 128);
   u8g2.drawVLine(108, 45, 18);
-  String gear;
+
+  // Gear
+  const char* gear;
+  char gearBuf[4];
   if (packet.gear == 0) gear = "R";
   else if (packet.gear == 1) gear = "N";
-  else gear = String(packet.gear - 1);
+  else {
+    mkbuf(gearBuf, "%d", packet.gear - 1);
+    gear = gearBuf;
+  }
   u8g2.setFont(u8g2_font_koleeko_tf);
-  u8g2.drawStr(116, 60, gear.c_str());
+  u8g2.drawStr(116, 60, gear);
 
   // Trip calculations
   if (tripOffset == 0) tripOffset = packet.odometer;
   uint32_t trip_diff = packet.odometer - tripOffset;
   float trip = trip_diff / 1000.0;
   if (trip >= 1000) {
-    tripOffset = packet.odometer - (trip - 1000.0);
-    trip = 0;
+    tripOffset += 1000000;
+    trip -= 1000;
   }
 
   // Switchable display
@@ -74,22 +84,24 @@ void updateDisplay(bool buttonClick, bool buttonHold) {
   if (displayId == 5 && !(packet.flags & OG_TURBO)) displayId = 0;
   if (displayId == 0) {
     time_t t = packet.time;
-    strftime(buf, sizeof(buf), "%d %b  %H:%M", gmtime(&t));
+    struct tm *tm_info = gmtime(&t);
+    if (tm_info != NULL) strftime(buf, sizeof(buf), "%d %b  %H:%M", tm_info);
+    else mkbuf(buf, "-- ---  --:--");
   }
   else if (displayId == 1) {
-    sprintf(buf, "Speed: %.0f kph", packet.speed * 3.6);
+    mkbuf(buf, "Speed: %.0f km/h", packet.speed * 3.6);
   }
   else if (displayId == 2) {
-    sprintf(buf, "Trip: %.2f km", trip);
+    mkbuf(buf, "Trip: %.2f km", trip);
   }
   else if (displayId == 3) {
-    sprintf(buf, "Fuel: %.1f%%", packet.fuel * 100);
+    mkbuf(buf, "Fuel: %.1f%%", packet.fuel * 100);
   }
   else if (displayId == 4) {
-    sprintf(buf, "Engine: %.1f C", packet.engTemp);
+    mkbuf(buf, "Engine: %.1f C", packet.engTemp);
   }
   else if (displayId == 5) {
-    sprintf(buf, "Boost: %.2f bar", packet.turbo);
+    mkbuf(buf, "Boost: %.2f bar", packet.turbo);
   }
   u8g2.drawStr(3, 60, buf);
 
