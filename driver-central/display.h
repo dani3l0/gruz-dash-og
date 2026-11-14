@@ -21,10 +21,16 @@ uint32_t tripOffset = 0;
 
 // Updates display with all data received?
 void updateDisplay(bool buttonClick, bool buttonHold) {
+  // Race-condition helper
+  OutGaugePacket data;
+  mutex_enter_blocking(&packetMutex);
+  memcpy(&data, &packet, sizeof(OutGaugePacket));
+  mutex_exit(&packetMutex);
+
   // Button events
-  if (packet.header[0] == specialChar) {
+  if (data.header[0] == specialChar) {
     if (buttonClick && ++displayId >= displaysCount) displayId = 0;
-    if (displayId == 2 && buttonHold) tripOffset = packet.odometer;
+    if (displayId == 2 && buttonHold) tripOffset = data.odometer;
   }
 
   // Throttle refresh speed
@@ -34,7 +40,7 @@ void updateDisplay(bool buttonClick, bool buttonHold) {
   u8g2.clearBuffer();
 
   // Welcome message
-  if (packet.header[0] != specialChar) {
+  if (data.header[0] != specialChar) {
     u8g2.setFont(u8g2_font_mystery_quest_24_tf);
     u8g2.drawStr(15, 32, "GruzDash");
     u8g2.setFont(u8g2_font_luRS08_tf);
@@ -43,14 +49,15 @@ void updateDisplay(bool buttonClick, bool buttonHold) {
     return;
   }
 
+  // Buffer
   char buf[32];
 
   // Odometer / Mileage display
   u8g2.setFont(u8g2_font_spleen16x32_mu);
-  mkbuf(buf, "%05" PRIu32, packet.odometer / 1000);
+  mkbuf(buf, "%05" PRIu32, data.odometer / 1000);
   u8g2.drawStr(28, 32, buf);
   u8g2.setFont(u8g2_font_missingplanet_tf);
-  mkbuf(buf, "%02" PRIu32, (packet.odometer % 1000) / 10);
+  mkbuf(buf, "%02" PRIu32, (data.odometer % 1000) / 10);
   u8g2.drawStr(112, 21, buf);
   u8g2.drawStr(112, 32, "km");
 
@@ -61,18 +68,18 @@ void updateDisplay(bool buttonClick, bool buttonHold) {
   // Gear
   const char* gear;
   char gearBuf[4];
-  if (packet.gear == 0) gear = "R";
-  else if (packet.gear == 1) gear = "N";
+  if (data.gear == 0) gear = "R";
+  else if (data.gear == 1) gear = "N";
   else {
-    mkbuf(gearBuf, "%d", packet.gear - 1);
+    mkbuf(gearBuf, "%d", data.gear - 1);
     gear = gearBuf;
   }
   u8g2.setFont(u8g2_font_koleeko_tf);
   u8g2.drawStr(116, 60, gear);
 
   // Trip calculations
-  if (tripOffset == 0) tripOffset = packet.odometer;
-  uint32_t trip_diff = packet.odometer - tripOffset;
+  if (tripOffset == 0) tripOffset = data.odometer;
+  uint32_t trip_diff = data.odometer - tripOffset;
   float trip = trip_diff / 1000.0;
   if (trip >= 1000) {
     tripOffset += 1000000;
@@ -81,27 +88,27 @@ void updateDisplay(bool buttonClick, bool buttonHold) {
 
   // Switchable display
   u8g2.setFont(u8g2_font_6x13_tf);
-  if (displayId == 5 && !(packet.flags & OG_TURBO)) displayId = 0;
+  if (displayId == 5 && !(data.flags & OG_TURBO)) displayId = 0;
   if (displayId == 0) {
-    time_t t = packet.time;
+    time_t t = data.time;
     struct tm *tm_info = gmtime(&t);
     if (tm_info != NULL) strftime(buf, sizeof(buf), "%d %b  %H:%M", tm_info);
     else mkbuf(buf, "-- ---  --:--");
   }
   else if (displayId == 1) {
-    mkbuf(buf, "Speed: %.0f km/h", packet.speed * 3.6);
+    mkbuf(buf, "Speed: %.0f km/h", data.speed * 3.6);
   }
   else if (displayId == 2) {
     mkbuf(buf, "Trip: %.2f km", trip);
   }
   else if (displayId == 3) {
-    mkbuf(buf, "Fuel: %.1f%%", packet.fuel * 100);
+    mkbuf(buf, "Fuel: %.1f%%", data.fuel * 100);
   }
   else if (displayId == 4) {
-    mkbuf(buf, "Engine: %.1f C", packet.engTemp);
+    mkbuf(buf, "Engine: %.1f C", data.engTemp);
   }
   else if (displayId == 5) {
-    mkbuf(buf, "Boost: %.2f bar", packet.turbo);
+    mkbuf(buf, "Boost: %.2f bar", data.turbo);
   }
   u8g2.drawStr(3, 60, buf);
 

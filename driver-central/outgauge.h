@@ -48,6 +48,7 @@ enum DashLightsBits : uint32_t {
 
 // Main data storage
 OutGaugePacket packet;
+auto_init_mutex(packetMutex);
 
 // Some runtime variables
 #define packetSize sizeof(OutGaugePacket)
@@ -100,7 +101,9 @@ void readOG() {
     uint8_t receivedChecksum = buff[packetSize - 1];
     // If ok, load packet into memory
     if (calcChecksum == receivedChecksum) {
+      mutex_enter_blocking(&packetMutex);
       memcpy(&packet, buff, packetSize);
+      mutex_exit(&packetMutex);
       lastPacketTime = now;
     }
   }
@@ -114,7 +117,6 @@ void readOG() {
     packet.engTemp = 0;
     packet.dashLights = 0;
     packet.showLights = 0;
-    packet.dashLights = 0;
     packet.header[0] = 'X';
     packet.header[1] = 'D';
     packet.header[2] = 'D';
