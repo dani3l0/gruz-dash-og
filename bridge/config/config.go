@@ -35,7 +35,7 @@ func Init() {
 		}
 		fmt.Println("Config file loaded, have fun!")
 	}
-	if Main.SerialPort == "auto" {
+	if Main.SerialPort == "auto" || Main.SerialPort == "" {
 		Main.SerialPort = detectPort()
 	}
 }
@@ -49,8 +49,8 @@ func detectPort() string {
 	}
 	for _, v := range entries {
 		n := v.Name()
-		fullpath := path.Join("/dev/", n)
 		if strings.HasPrefix(n, "ttyUSB") || strings.HasPrefix(n, "ttyACM") {
+			fullpath := path.Join("/dev/", n)
 			fmt.Println("Autodetected serial port: " + fullpath)
 			return fullpath
 		}
