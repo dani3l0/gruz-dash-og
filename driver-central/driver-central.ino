@@ -29,10 +29,7 @@ void setup() {
 void loop() {
   readOG();
   LHeadlights.set(!(packet.showLights & DL_FULLBEAM));
-  LCheckEngine.set(
-    packet.fuel < 0.15 || packet.engTemp > 105 ||
-    packet.oilTemp > 120 || packet.rpm < 450
-  );
+  LCheckEngine.set(packet.fuel < 0.15 || packet.engTemp > 105 || packet.oilTemp > 120);
   LTickR.set(packet.showLights & DL_SIGNAL_R);
   LTickL.set(packet.showLights & DL_SIGNAL_L);
   LHandbrake.set(packet.showLights & DL_HANDBRAKE);
