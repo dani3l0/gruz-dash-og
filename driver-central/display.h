@@ -28,6 +28,7 @@ void updateDisplay(bool buttonClick, bool buttonHold) {
   mutex_exit(&packetMutex);
 
   // Button events
+  if (data.odometer > 99999999) data.odometer = 99999999;
   if (data.header[0] == specialChar) {
     if (buttonClick && ++displayId >= displaysCount) displayId = 0;
     if (displayId == 2 && buttonHold) tripOffset = data.odometer;
